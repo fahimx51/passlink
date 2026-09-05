@@ -1,0 +1,76 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String
+  password  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  pastes     Paste[]
+  fileShares FileShare[]
+}
+
+model Paste {
+  id               String   @id @default(cuid())
+  slug             String   @unique
+  content          String   @db.Text
+  isPasswordLocked Boolean  @default(false)
+  passwordHash     String?
+  viewCount        Int      @default(0)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  expiresAt        DateTime
+
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String?
+
+  @@index([slug])
+  @@index([expiresAt])
+  @@index([userId])
+}
+
+// Parent container for a file share link (holds 1 or many files)
+model FileShare {
+  id               String   @id @default(cuid())
+  slug             String   @unique
+  isPasswordLocked Boolean  @default(false)
+  passwordHash     String?
+  downloadCount    Int      @default(0)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  expiresAt        DateTime
+
+  // Relation to uploaded files in this share link
+  files File[]
+
+  // Relation to User
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String?
+
+  @@index([slug])
+  @@index([expiresAt])
+  @@index([userId])
+}
+
+model File {
+  id       String @id @default(cuid())
+  fileUrl  String // S3 / Cloud storage link
+  fileName String // e.g. "document.pdf"
+  fileSize Int // File size in bytes
+  mimeType String // e.g. "application/pdf"
+
+  // Belongs to a FileShare container
+  fileShare   FileShare @relation(fields: [fileShareId], references: [id], onDelete: Cascade)
+  fileShareId String
+
+  @@index([fileShareId])
+}
