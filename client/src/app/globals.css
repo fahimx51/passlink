@@ -1,1 +1,5 @@
+@import "tailwindcss";
 @plugin "daisyui";
+
+/* Fix for Tailwind v4 + DaisyUI dark mode */
+@custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *));
