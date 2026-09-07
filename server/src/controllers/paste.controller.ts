@@ -53,7 +53,7 @@ export const createPaste = async (req: Request, res: Response) => {
             title: true,
             isPasswordLocked: true,
             maxViews: true,
-            viewCount: true,
+            viewsCount: true,
             expiresAt: true,
             createdAt: true,
         },

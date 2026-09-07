@@ -26,7 +26,7 @@ model Paste {
   content          String   @db.Text
   isPasswordLocked Boolean  @default(false)
   password         String?
-  viewCount        Int      @default(0)
+  viewsCount        Int      @default(0)
   maxViews         Int? // Nullable: null means unlimited views
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt

@@ -1,27 +1,27 @@
 import express, { Request, Response, NextFunction, type Application } from 'express';
 import cors from 'cors';
+import cookieParser from "cookie-parser";
 import pasteRouter from './routes/paste.route';
 import { AppError } from './utils/customError';
 import { ErrorMiddleware } from './middleware/errorHandler';
-import cookieParser from "cookie-parser";
-
 
 const app: Application = express();
 
+const allowedOrigin = process.env.CLIENT_URL || "http://localhost:3000";
+
 app.use(
     cors({
-        origin: process.env.FRONTEND_URL,
+        origin: allowedOrigin,
         credentials: true,
-        methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
-    }));
+        methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+        allowedHeaders: ['Content-Type', 'Authorization', 'Cookie'],
+    })
+);
 
 app.use(express.json({ limit: '1mb' }));
-
 app.use(cookieParser());
 
-
-//apis
-
+// APIs
 app.use('/api/pastes', pasteRouter);
 
 app.get('/health', (req, res) => {
@@ -36,7 +36,6 @@ app.use((req: Request, res: Response, next: NextFunction) => {
         )
     );
 });
-
 
 // Global Error Handling Middleware
 app.use(ErrorMiddleware);

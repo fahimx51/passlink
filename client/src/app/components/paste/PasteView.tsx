@@ -60,13 +60,15 @@ export function PasteView({ slug, initialData, initialIsLocked = false }: PasteV
             const res = await fetch(`${process.env.NEXT_PUBLIC_SERVER_URL}/api/pastes/protected-paste/${slug}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
                 body: JSON.stringify({ password }),
-            },);
+            });
 
             const result = await res.json();
 
             if (!res.ok || !result.success) {
-                throw new Error(result?.message || 'Incorrect password.');
+                const message = result?.error?.message || result?.message || 'Incorrect password.';
+                throw new Error(message);
             }
 
             setPaste(result.data);
@@ -74,7 +76,7 @@ export function PasteView({ slug, initialData, initialIsLocked = false }: PasteV
             setEditContent(result.data.content);
             setEditSlug(result.data.slug || slug);
             setEditMaxViews(result.data.maxViews || '');
-            setCurrentPassword(password); // Automatically save the password entered during unlock
+            setCurrentPassword(password);
             setIsLocked(false);
         } catch (err) {
             const error = err as Error;
@@ -97,12 +99,10 @@ export function PasteView({ slug, initialData, initialIsLocked = false }: PasteV
                 maxViews: editMaxViews !== '' ? Number(editMaxViews) : null,
             };
 
-            // Silently include currentPassword if the paste was protected
             if (currentPassword) {
                 payload.currentPassword = currentPassword;
             }
 
-            // Include new password if user wants to change/set it
             if (editPassword) {
                 payload.password = editPassword;
             }
@@ -110,19 +110,20 @@ export function PasteView({ slug, initialData, initialIsLocked = false }: PasteV
             const res = await fetch(`${process.env.NEXT_PUBLIC_SERVER_URL}/api/pastes/update-paste/${slug}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
                 body: JSON.stringify(payload),
             });
 
             const result = await res.json();
 
             if (!res.ok || !result.success) {
-                throw new Error(result?.message || 'Failed to update paste.');
+                const message = result?.error?.message || result?.message || 'Failed to update paste.';
+                throw new Error(message);
             }
 
             setPaste(result.data);
             setIsEditing(false);
 
-            // Update currentPassword state if password was updated
             if (editPassword) {
                 setCurrentPassword(editPassword);
                 setEditPassword('');
@@ -157,7 +158,7 @@ export function PasteView({ slug, initialData, initialIsLocked = false }: PasteV
                     <div className="bg-base-100 border border-base-200 rounded-3xl p-6 sm:p-8 shadow-sm flex flex-col gap-5">
                         <PasteHeader
                             title={paste.title}
-                            createdAt={paste.createdAt}
+                            expiresAt={paste.expiresAt}
                             maxViews={paste.maxViews}
                             viewsCount={paste.viewsCount}
                             isEditing={isEditing}

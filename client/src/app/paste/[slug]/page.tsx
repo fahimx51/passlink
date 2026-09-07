@@ -1,7 +1,21 @@
+"use client";
+
 import Footer from '@/app/components/common/Footer';
 import Navbar from '@/app/components/common/Navbar';
+import { PasteSkeleton } from '@/app/components/paste/PasteSkeleton';
 import { PasteView } from '@/app/components/paste/PasteView';
-import React from 'react';
+import React, { use, useEffect, useState } from 'react';
+
+interface PasteData {
+    title: string;
+    content?: string;
+    slug?: string;
+    createdAt?: string;
+    expiresAt?: string;
+    maxViews?: number | null;
+    viewsCount?: number;
+    isPasswordLocked?: boolean;
+}
 
 interface PageProps {
     params: Promise<{
@@ -9,39 +23,50 @@ interface PageProps {
     }>;
 }
 
-export default async function Page({ params }: PageProps) {
-    const { slug } = await params;
+export default function Page({ params }: PageProps) {
+    const { slug } = use(params);
 
-    let initialData = null;
-    let isLocked = false;
-    let errorMsg = '';
+    const [initialData, setInitialData] = useState<PasteData | null>(null);
+    const [isLocked, setIsLocked] = useState(false);
+    const [errorMsg, setErrorMsg] = useState('');
+    const [loading, setLoading] = useState(true);
 
-    try {
-        const res = await fetch(`${process.env.NEXT_PUBLIC_SERVER_URL}/api/pastes/get-paste/${slug}`, {
-            cache: 'no-store',
-        });
+    useEffect(() => {
+        async function fetchPaste() {
+            try {
+                const res = await fetch(`${process.env.NEXT_PUBLIC_SERVER_URL}/api/pastes/get-paste/${slug}`, {
+                    cache: 'no-store',
+                    credentials: 'include',
+                });
 
+                const contentType = res.headers.get('content-type');
+                let result = null;
+                if (contentType && contentType.includes('application/json')) {
+                    result = await res.json();
+                }
 
-        
-        const contentType = res.headers.get('content-type');
-        let result = null;
-        if (contentType && contentType.includes('application/json')) {
-            result = await res.json();
-            console.log("res => ", result);
+                if (!res.ok) {
+                    setErrorMsg(result?.message || 'Paste not found or expired.');
+                } else if (result?.isPasswordRequired) {
+                    setIsLocked(true);
+                    setInitialData(result.data);
+                } else {
+                    setInitialData(result?.data);
+                }
+            } catch (err) {
+                setErrorMsg('Failed to connect to the backend server.');
+            } finally {
+                setLoading(false);
+            }
         }
 
-        if (!res.ok) {
-            errorMsg = result?.message || 'Paste not found or expired.';
-        } else if (result?.isPasswordRequired) {
-            // Paste is locked with a password
-            isLocked = true;
-            initialData = result.data; // Contains title and expiresAt
-        } else {
-            // Unlocked paste
-            initialData = result?.data;
-        }
-    } catch (err) {
-        errorMsg = 'Failed to connect to the backend server.';
+        fetchPaste();
+    }, [slug]);
+
+    if (loading) {
+        return (
+            <PasteSkeleton />
+        );
     }
 
     if (errorMsg) {

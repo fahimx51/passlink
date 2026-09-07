@@ -56,12 +56,12 @@ export function CreatePasteForm() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload),
             });
-            
+
             const result = await res.json();
 
             if (!res.ok) {
                 // If backend Zod fails, display the backend message
-                throw new Error(result.message || 'Failed to create paste.');
+                throw new Error(result?.error?.message || 'Failed to create paste.');
             }
 
 

@@ -12,10 +12,10 @@ export const trackPasteView = async (
     reqCookies: Record<string, string> | undefined,
     res: Response
 ): Promise<Paste> => {
-
-    const cookieName = `viewed_paste_${paste.slug}`;
+    
+    const cookieName = `viewed_paste_${paste.id}`;
     const hasViewed = reqCookies?.[cookieName];
-
+    
     if (hasViewed) {
         return paste;
     }
@@ -23,22 +23,25 @@ export const trackPasteView = async (
     // Increment view count in DB
     const updatedPaste = await prisma.paste.update({
         where: { id: paste.id },
-        data: { viewCount: { increment: 1 } },
+        data: { viewsCount: { increment: 1 } },
     });
 
     // Set 24-hour cookie to prevent refresh spam
+    const isProd = process.env.NODE_ENV === "production";
     res.cookie(cookieName, "true", {
         maxAge: 24 * 60 * 60 * 1000,
         httpOnly: true,
-        sameSite: "lax",
+        sameSite: isProd ? "none" : "lax", // 'none' required cross-origin (Vercel <-> Railway/Render)
+        secure: isProd,                     // 'secure' is mandatory when sameSite is 'none'
     });
 
     // Delegate background deletion if limit is hit
-    if (updatedPaste.maxViews && updatedPaste.viewCount >= updatedPaste.maxViews) {
+    if (updatedPaste.maxViews && updatedPaste.viewsCount >= updatedPaste.maxViews) {
         await prisma.paste.delete({
             where: { id: updatedPaste.id },
         });
 
+        console.log(`Paste ${updatedPaste.slug} reached max views and was deleted.`);
         // Cancel the pending delayed TTL job in BullMQ (non-blocking)
         await removePasteFromQueue(updatedPaste.id);
     }
