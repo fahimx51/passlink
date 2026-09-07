@@ -1,9 +1,9 @@
 import express, { Request, Response, NextFunction, type Application } from 'express';
 import cors from 'cors';
 import cookieParser from "cookie-parser";
-import pasteRouter from './routes/paste.route';
-import { AppError } from './utils/customError';
-import { ErrorMiddleware } from './middleware/errorHandler';
+import pasteRouter from './routes/paste.route.js';
+import { AppError } from './utils/customError.js';
+import { ErrorMiddleware } from './middleware/errorHandler.js';
 
 const app: Application = express();
 

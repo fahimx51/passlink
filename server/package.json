@@ -5,11 +5,8 @@
   "main": "server.ts",
   "scripts": {
     "dev": "tsx watch src/server.ts",
-    "build": "prisma generate",
-    "build:render": "prisma generate && tsc",
-    "start": "node dist/server.js",
-    "migrate": "prisma migrate dev",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "prisma generate && tsup src/server.ts --format esm --clean",
+    "start": "node dist/server.js"
   },
   "keywords": [],
   "author": "",
@@ -36,6 +33,7 @@
     "@types/node": "^26.4.1",
     "@types/pg": "^8.23.1",
     "prisma": "^7.10.0",
+    "tsup": "^8.5.1",
     "tsx": "^4.23.13",
     "typescript": "^7.0.2"
   }

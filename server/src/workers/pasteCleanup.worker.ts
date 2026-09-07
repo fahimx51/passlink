@@ -1,7 +1,7 @@
 import { redis } from "../config/redis.js";
 import { Worker, Job } from "bullmq";
 import { prisma } from "../config/prisma.js";
-import { Prisma } from "../generated/prisma";
+import { Prisma } from "../generated/prisma/index.js";
 
 interface CleanupJobData {
     pasteId: string;
