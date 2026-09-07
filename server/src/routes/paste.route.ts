@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { accessProtectedPaste, createPaste, deletePaste, getPaste, updatePaste } from "../controllers/paste.controller";
+import { accessProtectedPaste, createPaste, deletePaste, getPaste, updatePaste } from "../controllers/paste.controller.js";
 
 const pasteRouter = Router();
 
