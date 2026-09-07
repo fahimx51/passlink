@@ -1,26 +1,14 @@
 {
   "compilerOptions": {
-    // File Layout
-    "rootDir": "./src",
-    "outDir": "./dist",
-    // Environment Settings
-    "module": "nodenext",
-    "moduleResolution": "nodenext",
-    "target": "es2022",
-    "types": [
-      "node"
-    ],
-    // Other Outputs
-    "sourceMap": true,
-    "declaration": true,
-    "declarationMap": true,
-    // Stricter Typechecking Options
-    "noUncheckedIndexedAccess": true,
-    // Recommended Options
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "moduleDetection": "force"
+    "noUncheckedIndexedAccess": true
   },
   "include": [
     "src/**/*"

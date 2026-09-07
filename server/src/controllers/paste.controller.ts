@@ -6,6 +6,7 @@ import { createPasteSchema, updatePasteSchema } from "../schemas/paste.schema.js
 import { trackPasteView } from "../services/paste.service.js";
 import { schedulePasteExpiration } from "../queues/pasteCleanup.queue.js";
 import { removePasteFromQueue } from "../utils/RemovePasteFromQueue.js";
+
 /**
  * Create a new paste
  * POST /api/pastes/create-paste
@@ -14,7 +15,7 @@ export const createPaste = async (req: Request, res: Response) => {
     const validationResult = createPasteSchema.safeParse(req.body);
 
     if (!validationResult.success) {
-        const errorMessage = validationResult.error.issues[0].message;
+        const errorMessage = validationResult.error.issues[0]?.message || "Validation failed.";
         throw new AppError(errorMessage, 400);
     }
 
@@ -181,7 +182,7 @@ export const updatePaste = async (req: Request, res: Response) => {
     const validationResult = updatePasteSchema.safeParse(req.body);
 
     if (!validationResult.success) {
-        const errorMessage = validationResult.error.issues[0].message;
+        const errorMessage = validationResult.error.issues[0]?.message || "Validation failed.";
         throw new AppError(errorMessage, 400);
     }
 
