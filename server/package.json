@@ -5,7 +5,8 @@
   "main": "server.ts",
   "scripts": {
     "dev": "tsx watch src/server.ts",
-    "build": "prisma generate && tsc",
+    "build": "prisma generate",
+    "build:render": "prisma generate && tsc",
     "start": "node dist/server.js",
     "migrate": "prisma migrate dev",
     "test": "echo \"Error: no test specified\" && exit 1"
