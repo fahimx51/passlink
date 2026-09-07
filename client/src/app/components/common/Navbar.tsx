@@ -22,8 +22,7 @@ export default function Navbar() {
     ];
 
     function isNavLinkActive(href: string): boolean {
-        if (href === '/') return pathname === '/';
-        return pathname.startsWith(href);
+        return pathname === href;
     }
 
     // Closes the mobile dropdown menu by removing focus from the button

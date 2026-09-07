@@ -4,8 +4,8 @@ import { prisma } from "../config/prisma.js";
 import { AppError } from "../utils/customError.js";
 import { createPasteSchema, updatePasteSchema } from "../schemas/paste.schema.js";
 import { trackPasteView } from "../services/paste.service.js";
-import { pasteCleanupQueue, schedulePasteExpiration } from "../queues/pasteCleanup.queue.js";
-
+import { schedulePasteExpiration } from "../queues/pasteCleanup.queue.js";
+import { removePasteFromQueue } from "../utils/RemovePasteFromQueue.js";
 /**
  * Create a new paste
  * POST /api/pastes/create-paste
@@ -53,15 +53,15 @@ export const createPaste = async (req: Request, res: Response) => {
             title: true,
             isPasswordLocked: true,
             maxViews: true,
+            viewCount: true,
             expiresAt: true,
             createdAt: true,
         },
     });
 
-    await schedulePasteExpiration(paste.id, expiresAt)
-        .catch((err) => {
-            console.error(`[BullMQ => createPaste] Failed to schedule expiration for paste ${paste.id}:`, err);
-        });
+    await schedulePasteExpiration(paste.id, expiresAt).catch((err) => {
+        console.error(`[BullMQ => createPaste] Failed to schedule expiration for paste ${paste.id}:`, err);
+    });
 
     return res.status(201).json({
         success: true,
@@ -82,15 +82,14 @@ export const getPaste = async (req: Request, res: Response) => {
     }
 
     const paste = await prisma.paste.findUnique({
-        where: {
-            slug,
-            expiresAt: {
-                gt: new Date(),
-            },
-        },
+        where: { slug },
     });
 
     if (!paste) {
+        throw new AppError("Paste not found or has expired.", 404);
+    }
+
+    if (new Date(paste.expiresAt) <= new Date()) {
         throw new AppError("Paste not found or has expired.", 404);
     }
 
@@ -102,11 +101,10 @@ export const getPaste = async (req: Request, res: Response) => {
                 title: paste.title,
                 expiresAt: paste.expiresAt,
             },
-            message: "This paste is password protected. Please provide the password to access its content.",
+            message: "This paste is password protected.",
         });
     }
 
-    // Process view increment & cookie setting via service
     const currentPaste = await trackPasteView(paste, req.cookies, res);
 
     const { password: _, ...safePaste } = currentPaste;
@@ -136,15 +134,14 @@ export const accessProtectedPaste = async (req: Request, res: Response) => {
     }
 
     const paste = await prisma.paste.findUnique({
-        where: {
-            slug,
-            expiresAt: {
-                gt: new Date(),
-            },
-        },
+        where: { slug },
     });
 
     if (!paste) {
+        throw new AppError("Paste not found or has expired.", 404);
+    }
+
+    if (new Date(paste.expiresAt) <= new Date()) {
         throw new AppError("Paste not found or has expired.", 404);
     }
 
@@ -158,7 +155,6 @@ export const accessProtectedPaste = async (req: Request, res: Response) => {
         throw new AppError("Invalid password.", 401);
     }
 
-    // Process view increment & cookie setting via service after password check
     const currentPaste = await trackPasteView(paste, req.cookies, res);
 
     const { password: _, ...safePaste } = currentPaste;
@@ -171,6 +167,10 @@ export const accessProtectedPaste = async (req: Request, res: Response) => {
     });
 };
 
+/**
+ * Update an existing paste
+ * PATCH /api/pastes/:slug
+ */
 export const updatePaste = async (req: Request, res: Response) => {
     const { slug } = req.params;
 
@@ -178,7 +178,6 @@ export const updatePaste = async (req: Request, res: Response) => {
         throw new AppError("Invalid slug parameter.", 400);
     }
 
-    // Zod Schema Validation
     const validationResult = updatePasteSchema.safeParse(req.body);
 
     if (!validationResult.success) {
@@ -189,27 +188,35 @@ export const updatePaste = async (req: Request, res: Response) => {
     const {
         title,
         content,
+        newSlug,
         extendTtl,
         maxViews,
         password,
-        currentPassword,
+        currentPassword
     } = validationResult.data;
 
-    // Fetch existing paste
     const existingPaste = await prisma.paste.findUnique({
-        where: {
-            slug,
-            expiresAt: {
-                gt: new Date(),
-            },
-        },
+        where: { slug },
     });
 
     if (!existingPaste) {
         throw new AppError("Paste not found or has expired.", 404);
     }
 
-    // Password Verification (If paste is currently password locked)
+    if (new Date(existingPaste.expiresAt) <= new Date()) {
+        throw new AppError("Paste has expired.", 404);
+    }
+
+    if (newSlug && newSlug !== slug) {
+        const slugOwner = await prisma.paste.findUnique({
+            where: { slug: newSlug },
+        });
+
+        if (slugOwner) {
+            throw new AppError("This custom URL is already taken.", 409);
+        }
+    }
+
     if (existingPaste.isPasswordLocked && existingPaste.password) {
         if (!currentPassword) {
             throw new AppError("Current password is required to modify this paste.", 401);
@@ -221,59 +228,46 @@ export const updatePaste = async (req: Request, res: Response) => {
         }
     }
 
-    // Build Dynamic Update Payload
     const updateData: Record<string, any> = {};
 
     if (title !== undefined) updateData.title = title;
     if (content !== undefined) updateData.content = content;
+    if (newSlug !== undefined) updateData.slug = newSlug;
     if (maxViews !== undefined) updateData.maxViews = maxViews;
 
-    // Handle TTL Extension
     if (extendTtl !== undefined) {
         const currentExpiration = new Date(existingPaste.expiresAt).getTime();
         const extendedTime = extendTtl * 24 * 60 * 60 * 1000;
         updateData.expiresAt = new Date(currentExpiration + extendedTime);
     }
 
-    // Handle Password Updating / Adding / Removing
     if (password !== undefined) {
         if (password.trim() === "") {
-            // Unlock paste by removing password
             updateData.password = null;
             updateData.isPasswordLocked = false;
         } else {
-            // Add new password or update existing
             updateData.password = await bcrypt.hash(password, 10);
             updateData.isPasswordLocked = true;
         }
     }
 
-    // Ensure at least one field is provided for update
     if (Object.keys(updateData).length === 0) {
         throw new AppError("No valid fields provided for update.", 400);
     }
 
-    // 5. Execute Update in Database
     const updatedPaste = await prisma.paste.update({
         where: { id: existingPaste.id },
         data: updateData,
     });
 
-
     if (extendTtl !== undefined) {
-        pasteCleanupQueue
-            .getJob(`expire-${updatedPaste.id}`)
-            .then((oldJob) => oldJob?.remove())
-            .catch((err) =>
-                console.error(`[BullMQ] Failed to remove old job for paste ${updatedPaste.id}:`, err)
-            );
+        await removePasteFromQueue(updatedPaste.id);
 
         schedulePasteExpiration(updatedPaste.id, updatedPaste.expiresAt).catch((err) =>
             console.error(`[BullMQ] Failed to reschedule expiration for paste ${updatedPaste.id}:`, err)
         );
     }
 
-    // Strip hashed password from response payload
     const { password: _, ...safePaste } = updatedPaste;
 
     return res.status(200).json({
@@ -283,6 +277,10 @@ export const updatePaste = async (req: Request, res: Response) => {
     });
 };
 
+/**
+ * Delete a paste manually
+ * DELETE /api/pastes/:slug
+ */
 export const deletePaste = async (req: Request, res: Response) => {
     const { slug } = req.params;
     const { currentPassword } = req.body;
@@ -291,7 +289,6 @@ export const deletePaste = async (req: Request, res: Response) => {
         throw new AppError("Invalid slug parameter.", 400);
     }
 
-    // 1. Fetch paste to verify existence and check password protection
     const paste = await prisma.paste.findUnique({
         where: { slug },
     });
@@ -300,7 +297,6 @@ export const deletePaste = async (req: Request, res: Response) => {
         throw new AppError("Paste not found or has already been deleted.", 404);
     }
 
-    // 2. Password Verification (If paste is password protected)
     if (paste.isPasswordLocked && paste.password) {
         if (!currentPassword || typeof currentPassword !== "string") {
             throw new AppError("Current password is required to delete this paste.", 401);
@@ -312,18 +308,11 @@ export const deletePaste = async (req: Request, res: Response) => {
         }
     }
 
-    // 3. Delete paste from database
     await prisma.paste.delete({
         where: { id: paste.id },
     });
 
-    // 4. Cancel scheduled BullMQ cleanup job (Fire and forget)
-    pasteCleanupQueue
-        .getJob(`expire-${paste.id}`)
-        .then((job) => job?.remove())
-        .catch((err) =>
-            console.error(`[BullMQ] Failed to remove cleanup job for deleted paste ${paste.id}:`, err)
-        );
+    await removePasteFromQueue(paste.id);
 
     return res.status(200).json({
         success: true,

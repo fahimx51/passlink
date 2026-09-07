@@ -8,7 +8,7 @@ pasteRouter.post("/create-paste", createPaste);
 
 pasteRouter.get("/get-paste/:slug", getPaste);
 
-pasteRouter.get("/get-protected-paste/:slug", accessProtectedPaste);
+pasteRouter.post("/protected-paste/:slug", accessProtectedPaste);
 
 pasteRouter.put("/update-paste/:slug", updatePaste);
 

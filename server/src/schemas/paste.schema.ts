@@ -43,6 +43,14 @@ export const updatePasteSchema = z.object({
         .min(1, "content cannot be empty")
         .optional(),
 
+    newSlug: z
+        .string()
+        .regex(
+            /^[a-zA-Z0-9_-]+$/,
+            "Custom URL slug can only contain letters, numbers, hyphens, and underscores."
+        )
+        .optional(),
+
     extendTtl: z
         .number("extendTtl must be a number, not a string")
         .int("extendTtl must be an integer")

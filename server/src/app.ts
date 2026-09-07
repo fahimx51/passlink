@@ -10,7 +10,9 @@ const app: Application = express();
 
 app.use(
     cors({
-        origin: process.env.FRONTEND_URL, credentials: true
+        origin: process.env.FRONTEND_URL,
+        credentials: true,
+        methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
     }));
 
 app.use(express.json({ limit: '1mb' }));

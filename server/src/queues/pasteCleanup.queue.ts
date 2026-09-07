@@ -14,16 +14,14 @@ export const pasteCleanupQueue = new Queue("paste-cleanup", {
  * Schedule a delayed deletion job for a paste when it expires
  */
 export const schedulePasteExpiration = async (pasteId: string, expiresAt: Date) => {
-    const delay = expiresAt.getTime() - Date.now();
+    const delay = Math.max(0, expiresAt.getTime() - Date.now());
 
-    if (delay > 0) {
-        await pasteCleanupQueue.add(
-            "delete-paste",
-            { pasteId },
-            {
-                delay,
-                jobId: `expire-${pasteId}`, // Unique ID prevents duplicate jobs
-            }
-        );
-    }
+    await pasteCleanupQueue.add(
+        "delete-paste",
+        { pasteId },
+        {
+            delay,
+            jobId: `expire-${pasteId}`,
+        }
+    );
 };

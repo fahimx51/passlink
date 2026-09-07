@@ -1,7 +1,7 @@
 import { Response } from "express";
 import { Paste } from "../generated/prisma/index.js";
 import { prisma } from "../config/prisma.js";
-import { pasteCleanupQueue } from "../queues/pasteCleanup.queue.js";
+import { removePasteFromQueue } from "../utils/RemovePasteFromQueue.js";
 
 /**
  * Increments paste view count if not already viewed in this session,
@@ -40,15 +40,7 @@ export const trackPasteView = async (
         });
 
         // Cancel the pending delayed TTL job in BullMQ (non-blocking)
-        pasteCleanupQueue
-            .getJob(`expire-${updatedPaste.id}`)
-            .then((job) => job?.remove())
-            .catch((err) => {
-                console.error(
-                    `[BullMQ] Failed to cancel delayed TTL job for paste ${updatedPaste.id}:`,
-                    err
-                );
-            });
+        await removePasteFromQueue(updatedPaste.id);
     }
 
     return updatedPaste;

@@ -14,20 +14,20 @@ const globalForPrisma = globalThis as unknown as {
     pgPool?: Pool;
 };
 
-// 1. Configure the PG Pool with explicit connection settings
+// 1. Configure the PG Pool with connection settings suitable for Neon
 export const pool =
     globalForPrisma.pgPool ??
     new Pool({
         connectionString,
-        max: process.env.NODE_ENV === "production" ? 20 : 5, // Connection limit based on env
-        idleTimeoutMillis: 30000, // Close idle connections after 30s
-        connectionTimeoutMillis: 5000, // Fail fast if DB connection hangs
+        max: process.env.NODE_ENV === "production" ? 10 : 5,
+        idleTimeoutMillis: 30000, // Keep connection alive in pool for 30s
+        connectionTimeoutMillis: 20000, // 20s allowance for Neon cold starts
     });
 
 // 2. Initialize Driver Adapter
 const adapter = new PrismaPg(pool);
 
-// 3. Initialize Prisma Client (Only logging errors and warnings)
+// 3. Initialize Prisma Client
 export const prisma =
     globalForPrisma.prisma ??
     new PrismaClient({
@@ -41,7 +41,7 @@ if (process.env.NODE_ENV !== "production") {
     globalForPrisma.prisma = prisma;
 }
 
-// 4. Graceful Shutdown Helper for deployment environments
+// 4. Graceful Shutdown Helper
 export const disconnectDatabase = async () => {
     await prisma.$disconnect();
     await pool.end();
