@@ -1,6 +1,6 @@
 import { NextFunction, Request, Response } from "express";
 import { AppError } from "../utils/customError.js";
-import { Prisma } from "../generated/prisma/client";
+import { Prisma } from "../generated/prisma/client.js";
 
 export const ErrorMiddleware = (
     err: any,
