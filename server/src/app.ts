@@ -7,6 +7,7 @@ import { ErrorMiddleware } from './middleware/errorHandler.js';
 
 const app: Application = express();
 
+
 const allowedOrigin = process.env.CLIENT_URL || "http://localhost:3000";
 
 app.use(
