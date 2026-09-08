@@ -4,6 +4,7 @@ import cookieParser from "cookie-parser";
 import pasteRouter from './routes/paste.route.js';
 import { AppError } from './utils/customError.js';
 import { ErrorMiddleware } from './middleware/errorHandler.js';
+import fileRouter from './routes/file.route.js';
 
 const app: Application = express();
 
@@ -24,6 +25,7 @@ app.use(cookieParser());
 
 // APIs
 app.use('/api/pastes', pasteRouter);
+app.use('/api/files', fileRouter);
 
 app.get('/health', (req, res) => {
     res.json({ status: 'ok' });

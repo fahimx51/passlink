@@ -15,8 +15,8 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  pastes     Paste[]
-  fileShares FileShare[]
+  pastes      Paste[]
+  fileRecords FileRecord[]
 }
 
 model Paste {
@@ -26,7 +26,7 @@ model Paste {
   content          String   @db.Text
   isPasswordLocked Boolean  @default(false)
   password         String?
-  viewsCount        Int      @default(0)
+  viewsCount       Int      @default(0)
   maxViews         Int? // Nullable: null means unlimited views
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
@@ -40,36 +40,32 @@ model Paste {
   @@index([userId])
 }
 
-model FileShare {
-  id               String   @id @default(cuid())
-  slug             String   @unique
-  isPasswordLocked Boolean  @default(false)
+model FileRecord {
+  id   String @id @default(cuid())
+  slug String @unique @default(nanoid(8))
+
+  // Storage & Metadata
+  fileUrl String // Relative Firebase path (e.g. "uploads/1710000000_bundle.zip")
+  fileName    String // Original filename shown to user (e.g. "bundle.zip")
+  fileSize    Int // Size in bytes
+  mimeType    String @default("application/zip")
+
+  // Protection & Limits
+  isPasswordLocked Boolean @default(false)
   password         String?
-  downloadCount    Int      @default(0)
+  downloadCount    Int     @default(0)
   downloadLimit    Int? // Nullable: null means unlimited downloads
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-  expiresAt        DateTime
 
-  files File[]
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  expiresAt DateTime
 
+  // Relations
   user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId String?
 
   @@index([slug])
   @@index([expiresAt])
   @@index([userId])
-}
-
-model File {
-  id       String @id @default(cuid())
-  fileUrl  String
-  fileName String
-  fileSize Int
-  mimeType String
-
-  fileShare   FileShare @relation(fields: [fileShareId], references: [id], onDelete: Cascade)
-  fileShareId String
-
-  @@index([fileShareId])
 }
