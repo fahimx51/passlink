@@ -7,7 +7,7 @@
     "dev": "tsx watch src/server.ts",
     "build": "prisma generate",
     "postinstall": "prisma generate",
-    "build:render": "prisma generate && tsup src/server.ts --format esm --clean",
+    "build:render": "prisma generate && tsup src/server.ts --format cjs --clean",
     "start": "node dist/server.js"
   },
   "keywords": [],
