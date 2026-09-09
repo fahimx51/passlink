@@ -49,6 +49,13 @@ export const initSocket = (httpServer: HTTPServer) => {
             }
         );
 
+        // Handle Explicit Leave Room Event
+        socket.on("leave-room", ({ roomId }: { roomId: string }) => {
+            socket.leave(roomId);
+            socket.to(roomId).emit("user-left", { signalUserId: socket.id });
+            console.log(`[Socket] ${socket.id} left room: ${roomId}`);
+        });
+
         // Handle Disconnection
         socket.on("disconnecting", () => {
             socket.rooms.forEach((roomId) => {

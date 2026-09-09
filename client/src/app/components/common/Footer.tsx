@@ -3,6 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { Share2, Shield, Heart, ExternalLink } from 'lucide-react';
+import { Logo } from './Logo';
 
 export default function Footer() {
     return (
@@ -13,12 +14,7 @@ export default function Footer() {
                     {/* Brand Info */}
                     <div className="md:col-span-5 space-y-4">
                         <div className="flex items-center gap-2">
-                            <div className="w-8 h-8 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center text-primary">
-                                <Share2 className="w-5 h-5" />
-                            </div>
-                            <span className="text-xl font-extrabold text-base-content tracking-tight">
-                                PassLink
-                            </span>
+                            <Logo />
                         </div>
                         <p className="text-sm text-base-content/70 max-w-sm leading-relaxed">
                             Fast, encrypted, and frictionless code, text, and file sharing platform. Powered by WebRTC direct transfers and auto-expiring pastes.

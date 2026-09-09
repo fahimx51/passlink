@@ -149,7 +149,7 @@ export default function Hero() {
 
                         <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-2.5 sm:gap-3 pt-1 sm:pt-2">
                             <Link
-                                href="#create-paste"
+                                href="/paste"
                                 className="btn btn-primary btn-sm sm:btn-md lg:btn-lg rounded-full w-full sm:w-auto gap-2 shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all duration-200 outline-none focus:outline-none focus:ring-0 text-xs sm:text-base font-semibold"
                             >
                                 Create a Paste
