@@ -4,6 +4,7 @@ import app from './app.js';
 import { initPasteCleanupWorker } from './workers/pasteCleanup.worker.js';
 import { initFileCleanupWorker } from './workers/fileCleanup.worker.js';
 import "./config/cloudinary.js";
+import { initSocket } from '../socket.js';
 
 const server = http.createServer(app);
 const PORT = process.env.PORT || 5000;
@@ -12,13 +13,16 @@ const PORT = process.env.PORT || 5000;
 let pasteWorker: ReturnType<typeof initPasteCleanupWorker> | null = null;
 let fileWorker: ReturnType<typeof initFileCleanupWorker> | null = null;
 
-server.listen(PORT, () => {
-    console.log(`Server running on port http://localhost:${PORT}`);
 
-    if (process.env.RENDER === "true" || process.env.NODE_ENV === "development") {
-        pasteWorker = initPasteCleanupWorker();
-        fileWorker = initFileCleanupWorker();
-    }
+if (process.env.RENDER === "true" || process.env.NODE_ENV === "development") {
+    initSocket(server);
+
+    pasteWorker = initPasteCleanupWorker();
+    fileWorker = initFileCleanupWorker();
+}
+
+server.listen(PORT, () => {
+    console.log(`Server running on port : ${PORT}`);
 });
 
 // Complete Graceful Shutdown Logic
