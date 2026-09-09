@@ -1,4 +1,4 @@
-import { fileCleanupQueue, scheduleFileExpiration } from "../queues/fileCleanup.queue";
+import { fileCleanupQueue, scheduleFileExpiration } from "../queues/fileCleanup.queue.js";
 
 /**
  * Reschedule or update the expiration job if a file's TTL is updated
