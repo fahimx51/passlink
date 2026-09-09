@@ -45,10 +45,10 @@ model FileRecord {
   slug String @unique @default(nanoid(8))
 
   // Storage & Metadata
-  fileUrl String // Relative Firebase path (e.g. "uploads/1710000000_bundle.zip")
-  fileName    String // Original filename shown to user (e.g. "bundle.zip")
-  fileSize    Int // Size in bytes
-  mimeType    String @default("application/zip")
+  fileUrl  String //Stores Cloudinary public_id (e.g. "passlink_uploads/1710000000_bundle")
+  fileName String // Original filename shown to user (e.g. "bundle.zip")
+  fileSize Int // Size in bytes
+  mimeType String @default("application/zip")
 
   // Protection & Limits
   isPasswordLocked Boolean @default(false)

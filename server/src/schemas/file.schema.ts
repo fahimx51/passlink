@@ -9,7 +9,7 @@ export const createSignedUploadUrlSchema = z.object({
     fileSize: z
         .number("fileSize must be a number")
         .min(1, "fileSize must be atleast 1 byte")
-        .max(20 * 1024 * 1024, "fileSize can be atmost 20 MB"),
+        .max(10 * 1024 * 1024, "fileSize can be atmost 10 MB"),
 
     ttl: z
         .number("ttl must be a number, not a string")
@@ -50,7 +50,17 @@ export const deleteFileRecordSchema = z.object({
         .optional(),
 });
 
+export const updateFileRecordSchema = z.object({
+    password: z.string().optional(), // Old password if protected
+    newPassword: z.string().optional(), // New password to update
+    ttl: z.number().positive().optional(), // Days to extend expiry
+    downloadLimit: z.number().nullable().optional(), // New max limit (null for unlimited)
+    newSlug: z.string().min(3).optional(), // New custom path
+});
+
+
 // Inferred TypeScript Types
 export type CreateSignedUploadUrlInput = z.infer<typeof createSignedUploadUrlSchema>;
 export type GetFileDownloadUrlInput = z.infer<typeof getFileDownloadUrlSchema>;
 export type DeleteFileRecordInput = z.infer<typeof deleteFileRecordSchema>;
+export type UpdateFileRecordInput = z.infer<typeof updateFileRecordSchema>;

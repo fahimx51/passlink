@@ -1,13 +1,14 @@
 import { Request, Response } from "express";
 import bcrypt from "bcrypt";
 import { prisma } from "../config/prisma.js";
-import { bucket } from "../config/firebase.js";
 import { AppError } from "../utils/customError.js";
 import {
     createSignedUploadUrlSchema,
     getFileDownloadUrlSchema,
     deleteFileRecordSchema,
+    updateFileRecordSchema,
 } from "../schemas/file.schema.js";
+import cloudinary from "../config/cloudinary.js";
 
 interface SlugParam {
     slug: string;
@@ -15,15 +16,12 @@ interface SlugParam {
 
 /**
  * 1. POST /api/files/upload-url
- * Validates metadata, calculates expiration, creates FileRecord,
- * and generates a 15-minute Firebase v4 PUT upload URL.
+ * Strips file extension from public_id to prevent double-extension bugs on Cloudinary
  */
 export const createSignedUploadUrl = async (req: Request, res: Response) => {
-    // Use .parse() to extract validated values
     const { fileName, fileSize, ttl, password, slug, downloadLimit } =
         createSignedUploadUrlSchema.parse(req.body);
 
-    // If custom slug provided, check availability
     if (slug) {
         const existingRecord = await prisma.fileRecord.findUnique({
             where: { slug },
@@ -34,17 +32,19 @@ export const createSignedUploadUrl = async (req: Request, res: Response) => {
         }
     }
 
-    // Calculate expiration date from TTL in days
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + ttl);
 
-    const storagePath = `uploads/${Date.now()}_${fileName}`;
     const passwordHash = password ? await bcrypt.hash(password, 10) : null;
+
+    // Strip extension from public_id so Cloudinary handles formatting cleanly
+    const nameWithoutExt = fileName.substring(0, fileName.lastIndexOf(".")) || fileName;
+    const publicId = `passlink_uploads/${Date.now()}_${nameWithoutExt}`;
 
     const fileRecord = await prisma.fileRecord.create({
         data: {
             ...(slug ? { slug } : {}),
-            fileUrl: storagePath,
+            fileUrl: publicId, // Clean Cloudinary public_id without extension
             fileName,
             fileSize,
             mimeType: "application/zip",
@@ -55,26 +55,18 @@ export const createSignedUploadUrl = async (req: Request, res: Response) => {
         },
     });
 
-    // Generate 15-minute v4 PUT signed URL
-    const [uploadUrl] = await bucket.file(storagePath).getSignedUrl({
-        version: "v4",
-        action: "write",
-        expires: Date.now() + 15 * 60 * 1000,
-        contentType: "application/zip",
-    });
-
     return res.status(201).json({
         success: true,
         data: {
-            uploadUrl,
+            publicId: fileRecord.fileUrl,
             slug: fileRecord.slug,
+            cloudName: process.env.CLOUDINARY_CLOUD_NAME,
         },
     });
 };
 
 /**
  * 2. GET /api/files/:slug
- * Retrieves public file metadata for rendering download page UI.
  */
 export const getFileDetails = async (req: Request<SlugParam>, res: Response) => {
     const { slug } = req.params;
@@ -118,8 +110,7 @@ export const getFileDetails = async (req: Request<SlugParam>, res: Response) => 
 
 /**
  * 3. POST /api/files/:slug/download
- * Validates password, checks limits, increments download counter,
- * and returns a 15-minute Firebase v4 READ signed URL.
+ * Generates signed download URL without double extensions
  */
 export const getFileDownloadUrl = async (
     req: Request<SlugParam>,
@@ -162,12 +153,20 @@ export const getFileDownloadUrl = async (
         }
     }
 
-    const [downloadUrl] = await bucket.file(fileRecord.fileUrl).getSignedUrl({
-        version: "v4",
-        action: "read",
-        expires: Date.now() + 15 * 60 * 1000,
+    // Ensure publicId includes .zip extension so Cloudinary locates the raw archive
+    const rawPublicId = fileRecord.fileUrl.endsWith(".zip")
+        ? fileRecord.fileUrl
+        : `${fileRecord.fileUrl}.zip`;
+
+    // Generate authenticated signed URL for raw zip file
+    const downloadUrl = cloudinary.url(rawPublicId, {
+        resource_type: "raw",
+        flags: "attachment", // Forces direct browser download
+        sign_url: true,
+        secure: true,
     });
 
+    // Increment download count
     await prisma.fileRecord.update({
         where: { id: fileRecord.id },
         data: { downloadCount: { increment: 1 } },
@@ -184,8 +183,6 @@ export const getFileDownloadUrl = async (
 
 /**
  * 4. DELETE /api/files/:slug
- * Validates password, removes file object from Firebase,
- * and deletes row from Prisma DB.
  */
 export const deleteFileRecord = async (
     req: Request<SlugParam>,
@@ -217,10 +214,15 @@ export const deleteFileRecord = async (
         }
     }
 
-    // Delete object from Firebase Storage
-    await bucket.file(fileRecord.fileUrl).delete({ ignoreNotFound: true });
+    try {
+        await cloudinary.uploader.destroy(fileRecord.fileUrl, {
+            resource_type: "raw",
+            invalidate: true,
+        });
+    } catch (err) {
+        console.error("Cloudinary file deletion warning:", err);
+    }
 
-    // Delete record from Prisma DB
     await prisma.fileRecord.delete({
         where: { id: fileRecord.id },
     });
@@ -228,5 +230,98 @@ export const deleteFileRecord = async (
     return res.status(200).json({
         success: true,
         message: "File permanently deleted.",
+    });
+};
+
+export const updateFileRecord = async (
+    req: Request<SlugParam>,
+    res: Response
+) => {
+    const { slug } = req.params;
+    const body = updateFileRecordSchema.parse(req.body);
+
+    const fileRecord = await prisma.fileRecord.findUnique({
+        where: { slug },
+    });
+
+    if (!fileRecord) {
+        throw new AppError("File record not found.", 404);
+    }
+
+    // Verify current password if protected
+    if (fileRecord.isPasswordLocked) {
+        if (!body.password) {
+            throw new AppError("Current password required to edit settings.", 401);
+        }
+
+        if (!fileRecord.password) {
+            throw new AppError("Corrupted password record.", 500);
+        }
+
+        const isMatch = await bcrypt.compare(body.password, fileRecord.password);
+        if (!isMatch) {
+            throw new AppError("Invalid current password.", 403);
+        }
+    }
+
+    // Handle slug change collision check
+    if (body.newSlug && body.newSlug !== fileRecord.slug) {
+        const existingSlug = await prisma.fileRecord.findUnique({
+            where: { slug: body.newSlug },
+        });
+
+        if (existingSlug) {
+            throw new AppError("The new custom URL slug is already in use.", 409);
+        }
+    }
+
+    // Calculate updated expiration if TTL passed
+    let newExpiresAt = fileRecord.expiresAt;
+    if (body.ttl) {
+        newExpiresAt = new Date();
+        newExpiresAt.setDate(newExpiresAt.getDate() + body.ttl);
+    }
+
+    // Hash new password if provided
+    let newPasswordHash = fileRecord.password;
+    let isPasswordLocked = fileRecord.isPasswordLocked;
+
+    if (body.newPassword !== undefined) {
+        if (body.newPassword.trim() === "") {
+            newPasswordHash = null;
+            isPasswordLocked = false;
+        } else {
+            newPasswordHash = await bcrypt.hash(body.newPassword, 10);
+            isPasswordLocked = true;
+        }
+    }
+
+    const updatedRecord = await prisma.fileRecord.update({
+        where: { id: fileRecord.id },
+        data: {
+            slug: body.newSlug || fileRecord.slug,
+            expiresAt: newExpiresAt,
+            password: newPasswordHash,
+            isPasswordLocked,
+            downloadLimit: body.downloadLimit !== undefined ? body.downloadLimit : fileRecord.downloadLimit,
+        },
+        select: {
+            id: true,
+            slug: true,
+            fileName: true,
+            fileSize: true,
+            mimeType: true,
+            isPasswordLocked: true,
+            downloadCount: true,
+            downloadLimit: true,
+            expiresAt: true,
+            createdAt: true,
+        },
+    });
+
+    return res.status(200).json({
+        success: true,
+        message: "File settings updated successfully.",
+        data: { fileRecord: updatedRecord },
     });
 };

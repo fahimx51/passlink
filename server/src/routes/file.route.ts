@@ -4,6 +4,7 @@ import {
     getFileDetails,
     getFileDownloadUrl,
     deleteFileRecord,
+    updateFileRecord,
 } from "../controllers/file.controller.js";
 
 const fileRouter = Router();
@@ -28,8 +29,16 @@ fileRouter.post("/:slug/download", getFileDownloadUrl);
 
 /**
  * @route   DELETE /api/files/:slug
+ * @desc    update files
+ */
+
+fileRouter.patch("/:slug", updateFileRecord);
+
+/**
+ * @route   DELETE /api/files/:slug
  * @desc    Verify password and permanently delete file record & storage object
  */
+
 fileRouter.delete("/:slug", deleteFileRecord);
 
 export default fileRouter;

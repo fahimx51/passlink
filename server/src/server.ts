@@ -2,6 +2,7 @@ import 'dotenv/config';
 import http from 'http';
 import app from './app.js';
 import { initPasteCleanupWorker } from './workers/pasteCleanup.worker.js';
+import "./config/cloudinary.js";
 
 const server = http.createServer(app);
 const PORT = process.env.PORT || 5000;

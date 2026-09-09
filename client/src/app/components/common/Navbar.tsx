@@ -17,7 +17,7 @@ export default function Navbar() {
     const links: NavItem[] = [
         { href: '/', label: 'Home' },
         { href: '/paste', label: 'Paste' },
-        { href: '/files', label: 'Files' },
+        { href: '/file', label: 'Files' },
         { href: '/p2p', label: 'P2P Transfer' },
     ];
 
