@@ -2,6 +2,7 @@ import 'dotenv/config';
 import http from 'http';
 import app from './app.js';
 import { initPasteCleanupWorker } from './workers/pasteCleanup.worker.js';
+import { initFileCleanupWorker } from './workers/fileCleanup.worker.js';
 import "./config/cloudinary.js";
 
 const server = http.createServer(app);
@@ -9,12 +10,14 @@ const PORT = process.env.PORT || 5000;
 
 // Store worker reference in a variable
 let pasteWorker: ReturnType<typeof initPasteCleanupWorker> | null = null;
+let fileWorker: ReturnType<typeof initFileCleanupWorker> | null = null;
 
 server.listen(PORT, () => {
     console.log(`Server running on port http://localhost:${PORT}`);
 
     if (process.env.RENDER === "true" || process.env.NODE_ENV === "development") {
         pasteWorker = initPasteCleanupWorker();
+        fileWorker = initFileCleanupWorker();
     }
 });
 
@@ -28,6 +31,10 @@ const shutdown = async () => {
         if (pasteWorker) {
             await pasteWorker.close();
             console.log('BullMQ paste cleanup worker closed.');
+        }
+        if (fileWorker) {
+            await fileWorker.close();
+            console.log('BullMQ file cleanup worker closed.');
         }
         process.exit(0);
     });

@@ -9,6 +9,9 @@ import {
     updateFileRecordSchema,
 } from "../schemas/file.schema.js";
 import cloudinary from "../config/cloudinary.js";
+import { deleteFileRecordAndStorage } from "../services/file.service.js";
+import { cancelFileExpirationJob, updateFileExpirationJob } from "../utils/fileQueue.js";
+import { scheduleFileExpiration } from "../queues/fileCleanup.queue.js";
 
 interface SlugParam {
     slug: string;
@@ -32,8 +35,7 @@ export const createSignedUploadUrl = async (req: Request, res: Response) => {
         }
     }
 
-    const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + ttl);
+    const expiresAt = new Date(Date.now() + ttl * 24 * 60 * 60 * 1000);
 
     const passwordHash = password ? await bcrypt.hash(password, 10) : null;
 
@@ -54,6 +56,8 @@ export const createSignedUploadUrl = async (req: Request, res: Response) => {
             expiresAt,
         },
     });
+
+    await scheduleFileExpiration(fileRecord.id, expiresAt);
 
     return res.status(201).json({
         success: true,
@@ -167,10 +171,18 @@ export const getFileDownloadUrl = async (
     });
 
     // Increment download count
-    await prisma.fileRecord.update({
+    const updatedRecord = await prisma.fileRecord.update({
         where: { id: fileRecord.id },
         data: { downloadCount: { increment: 1 } },
     });
+
+    if (
+        updatedRecord.downloadLimit !== null &&
+        updatedRecord.downloadCount >= updatedRecord.downloadLimit
+    ) {
+        await cancelFileExpirationJob(fileRecord.id);
+        await deleteFileRecordAndStorage(fileRecord.id);
+    }
 
     return res.status(200).json({
         success: true,
@@ -191,6 +203,7 @@ export const deleteFileRecord = async (
     const { slug } = req.params;
     const { password } = deleteFileRecordSchema.parse(req.body);
 
+    // 1. Fetch record to verify existence and credentials
     const fileRecord = await prisma.fileRecord.findUnique({
         where: { slug },
     });
@@ -199,6 +212,7 @@ export const deleteFileRecord = async (
         throw new AppError("File record not found.", 404);
     }
 
+    // 2. Password validation check
     if (fileRecord.isPasswordLocked) {
         if (!password) {
             throw new AppError("Password required to delete this file.", 401);
@@ -214,18 +228,11 @@ export const deleteFileRecord = async (
         }
     }
 
-    try {
-        await cloudinary.uploader.destroy(fileRecord.fileUrl, {
-            resource_type: "raw",
-            invalidate: true,
-        });
-    } catch (err) {
-        console.error("Cloudinary file deletion warning:", err);
-    }
+    // 3. Cancel the scheduled BullMQ job so the worker doesn't run unnecessarily
+    await cancelFileExpirationJob(fileRecord.id);
 
-    await prisma.fileRecord.delete({
-        where: { id: fileRecord.id },
-    });
+    // 4. Delegate Cloudinary & DB deletion to service function
+    await deleteFileRecordAndStorage(fileRecord.id);
 
     return res.status(200).json({
         success: true,
@@ -278,8 +285,8 @@ export const updateFileRecord = async (
     // Calculate updated expiration if TTL passed
     let newExpiresAt = fileRecord.expiresAt;
     if (body.ttl) {
-        newExpiresAt = new Date();
-        newExpiresAt.setDate(newExpiresAt.getDate() + body.ttl);
+        newExpiresAt = new Date(Date.now() + body.ttl * 24 * 60 * 60 * 1000);
+        await updateFileExpirationJob(fileRecord.id, newExpiresAt);
     }
 
     // Hash new password if provided
