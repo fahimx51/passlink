@@ -3,9 +3,6 @@
 **Pass the Link to someone.**
 
 PassLink is a privacy-first app for moving data between people quickly and without a trace. Share text and code with a self-destruct timer, host password-locked files with an expiry date, or send files directly between two browsers over WebRTC with nothing touching a server in between.
-
-Repo: [github.com/fahimx51/passlink](https://github.com/fahimx51/passlink)
-
 ---
 
 ## Live deployments
@@ -131,7 +128,7 @@ flowchart TD
     Workers -->|Delete assets| Cloudinary
 
     PeerA -.->|Direct signed PUT| Cloudinary
-    PeerA <=="Direct WebRTC P2P (RTCDataChannel)"=> PeerB
+    PeerA <==Direct WebRTC P2P==> PeerB
 ```
 
 ### WebRTC P2P transfer protocol
