@@ -10,8 +10,5 @@ const getRedisUrl = () => {
 
 export const redis = new Redis(getRedisUrl(), {
     maxRetriesPerRequest: null, // Required by BullMQ
-    enableReadyCheck: false,    // Required for serverless Redis like Upstash
-    tls: {
-        rejectUnauthorized: false, // Ensures TLS/SSL handshakes complete smoothly
-    },
+    enableReadyCheck: false,    // Safe for standard and serverless Redis
 });

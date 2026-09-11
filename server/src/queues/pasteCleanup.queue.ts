@@ -6,7 +6,7 @@ export const pasteCleanupQueue = new Queue("paste-cleanup", {
     connection: redis,
     defaultJobOptions: {
         removeOnComplete: true, // Auto-delete job metadata from Redis once done
-        removeOnFail: 100,      // Keep last 100 failed jobs for debugging
+        removeOnFail: { count: 10 },      // Keep last 10 failed jobs for debugging
     },
 });
 

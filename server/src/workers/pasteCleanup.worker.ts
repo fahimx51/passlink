@@ -32,6 +32,7 @@ export const initPasteCleanupWorker = () => {
         {
             connection: redis,
             concurrency: 5,
+            drainDelay: 5000, // Waits 5s when queue is empty to reduce Redis polling
         }
     );
 

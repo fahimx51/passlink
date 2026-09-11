@@ -4,8 +4,8 @@ import { redis } from "../config/redis.js";
 export const fileCleanupQueue = new Queue("file-cleanup", {
     connection: redis,
     defaultJobOptions: {
-        removeOnComplete: true, // Auto-delete job metadata from Redis once done
-        removeOnFail: 100,      // Keep last 100 failed jobs for debugging
+        removeOnComplete: true, // Auto-delete job metadata from Redis once completed
+        removeOnFail: { count: 10 }, // Keep only the last 10 failed jobs for debugging
     },
 });
 
@@ -20,8 +20,7 @@ export const scheduleFileExpiration = async (fileId: string, expiresAt: Date) =>
         { fileId },
         {
             delay,
-            jobId: `expire-${fileId}`,
+            jobId: `expire-${fileId}`, // Ensures no duplicate jobs exist for the same file
         }
     );
 };
-
