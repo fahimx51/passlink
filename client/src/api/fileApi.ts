@@ -97,7 +97,8 @@ export const uploadFileToCloudinary = (
 
         xhr.onerror = () => reject(new Error("Network error during file upload to Cloudinary."));
 
-        xhr.open("POST", `https://api.cloudinary.com/v1_1/${cloudName}/auto/upload`, true);
+        // Changed /auto/upload to /raw/upload
+        xhr.open("POST", `https://api.cloudinary.com/v1_1/${cloudName}/raw/upload`, true);
         xhr.send(formData);
     });
 };
